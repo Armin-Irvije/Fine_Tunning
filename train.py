@@ -1,5 +1,6 @@
 import os
 import torch
+import math
 from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -121,7 +122,14 @@ trainer = Trainer(
 )
 
 # Train model
+print('Fine tune model...')
 trainer.train()
+print('Evaluate...')
+metrics = trainer.evaluate()
+eval_loss = metrics['eval_loss']
+perplexity = math.exp(eval_loss)
+print(f"\nEval loss: {eval_loss:.4f}")
+print(f"Perplexity: {perplexity:.4f}")
 
 # Save the fine-tuned model
 model.save_pretrained(f"{OUTPUT_DIR}/final")
