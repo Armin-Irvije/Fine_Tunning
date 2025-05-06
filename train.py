@@ -59,6 +59,8 @@ peft_config = LoraConfig(
 )
 
 model = get_peft_model(model, peft_config)
+# device = 'cpu'
+# model.to(device)
 
 # Tokenize the datasets
 def preprocess_function(examples):
@@ -109,7 +111,8 @@ training_args = TrainingArguments(
     gradient_checkpointing=False,  
     warmup_ratio=0.1,
     weight_decay=0.01,
-    remove_unused_columns=False  # Important for PeftModel
+    remove_unused_columns=False,  # Important for PeftModel
+    # use_cpu = True
 )
 
 # Initialize Trainer

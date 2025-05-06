@@ -1,6 +1,7 @@
 from datasets import load_dataset
 from transformers import GPT2Tokenizer, GPT2ForSequenceClassification, TrainingArguments, Trainer
 import pandas as pd
+import numpy as np
 import evaluate
 import torch
 dataset = load_dataset("mteb/tweet_sentiment_extraction")
@@ -20,8 +21,8 @@ small_train_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(
 small_eval_dataset = tokenized_datasets["test"].shuffle(seed=42).select(range(1000))
 
 model = GPT2ForSequenceClassification.from_pretrained("gpt2", num_labels=3)
-device = torch.device('cpu')
-model.to(device)
+# device = torch.device('cpu')
+# model.to(device)
 # transformers provides a trainer class optimized for traiining,
 # however, this method does not include how to evaluate the model.
 # thus we need to pass an evaluation function to trainer
@@ -39,7 +40,7 @@ training_args = TrainingArguments(
    per_device_train_batch_size = 1,
    per_device_eval_batch_size = 1,
    gradient_accumulation_steps = 4,
-   use_cpu = True
+   # use_cpu = True
 )
 
 trainer = Trainer(
@@ -51,4 +52,5 @@ trainer = Trainer(
 )
 
 trainer.train()
-trainer.evaluate()
+metrics = trainer.evaluate()
+print("Evaluation Loss: ", metrics)
