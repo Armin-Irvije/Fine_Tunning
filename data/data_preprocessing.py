@@ -5,11 +5,11 @@ import random
 from typing import List, Dict, Any
 
 # Create directories
-os.makedirs('data/processed', exist_ok=True)
-os.makedirs('data/evaluation', exist_ok=True)
+os.makedirs('processed', exist_ok=True)
+os.makedirs('evaluation', exist_ok=True)
 
 # Load the pharmaceutical dataset
-df = pd.read_csv('data/raw/drugs_dataset.csv')
+df = pd.read_csv('raw/drugs_dataset.csv')
 
 # Clean data
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -144,11 +144,11 @@ train_examples = all_examples[:split_idx]
 eval_examples = all_examples[split_idx:]
 
 # Save to files
-with open('data/processed/train.jsonl', 'w') as f:
+with open('processed/train.jsonl', 'w') as f:
     for example in train_examples:
         f.write(json.dumps(example) + '\n')
 
-with open('data/evaluation/eval.jsonl', 'w') as f:
+with open('evaluation/eval.jsonl', 'w') as f:
     for example in eval_examples:
         f.write(json.dumps(example) + '\n')
 
