@@ -15,6 +15,7 @@ from peft import get_peft_model, LoraConfig, TaskType
 os.makedirs('models', exist_ok=True)
 os.makedirs('results', exist_ok=True)
 
+torch.manual_seed(42)
 # Configuration
 MODEL_NAME = "openai-community/gpt2"
 OUTPUT_DIR = "models/drug-llm"
@@ -23,7 +24,7 @@ LORA_ALPHA = 16
 LORA_DROPOUT = 0.05
 BATCH_SIZE = 4  # Reduced batch size
 GRADIENT_ACCUMULATION_STEPS = 8  # Increased gradient accumulation
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 3e-4
 NUM_EPOCHS = 3
 MAX_LENGTH = 512
 
