@@ -4,7 +4,7 @@ This project fine-tunes a GPT-2 model on prescription medication data to create 
 
 ## Overview
 
-Drug-LLM leverages the OpenAI GPT-2 base model and applies Parameter-Efficient Fine-Tuning (PEFT) using Low-Rank Adaptation (LoRA) to create a domain-specific model for medication information. The model is trained on instruction-following data formatted as input-output pairs for medication-related queries.
+Drug-LLM leverages the OpenAI GPT-2 base model and applies Parameter-Efficient Fine-Tuning using Low-Rank Adaptation to create a domain-specific model for medication information. The model is trained on instruction-following data formatted as input-output pairs for medication-related queries.
 
 ## Project Structure
 
@@ -27,24 +27,8 @@ Drug-LLM leverages the OpenAI GPT-2 base model and applies Parameter-Efficient F
 - Python 3.8+
 - PyTorch
 - Transformers
-- PEFT (Parameter-Efficient Fine-Tuning)
+- PEFT 
 - Datasets
-- TensorBoard (for logging)
-
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/drug-llm.git
-cd drug-llm
-
-# Create and activate a virtual environment (optional but recommended)
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install torch transformers datasets peft tensorboard
-```
 
 ## Data Format
 
@@ -58,36 +42,12 @@ Example:
 {"input": "What are the common side effects of Lisinopril?", "output": "Common side effects of Lisinopril include dry cough, dizziness, headache, fatigue, and nausea. In some cases, it may cause more serious side effects such as swelling of the face, lips, tongue, or throat. Contact your healthcare provider if you experience severe side effects."}
 ```
 
-## Training
-
-The training script (`train.py`) configures and runs the fine-tuning process:
-
-```bash
-python train.py
-```
-
-### Training Configuration
-
-The script uses the following hyperparameters:
-
-- Base model: `openai-community/gpt2`
-- LoRA rank: 8
-- LoRA alpha: 16
-- LoRA dropout: 0.05
-- Batch size: 4
-- Gradient accumulation steps: 8
-- Learning rate: 1e-4
-- Epochs: 3
-- Max sequence length: 512
-
-These parameters can be adjusted in the training script according to your requirements and hardware constraints.
-
 ## Model Architecture
 
-The model uses Low-Rank Adaptation (LoRA) to efficiently fine-tune the base GPT-2 model:
+The model uses Low-Rank Adaptation to efficiently fine-tune the base GPT-2 model:
 
 - LoRA applies trainable rank decomposition matrices to the attention layers
-- Target module: `c_attn` (attention layer in GPT-2)
+- Target module: `c_attn` 
 - The approach reduces the number of trainable parameters significantly compared to full fine-tuning
 
 ## Evaluation
@@ -101,3 +61,4 @@ During training, the model is evaluated periodically on a validation dataset. Af
 
 - OpenAI for the GPT-2 base model
 - Hugging Face for the Transformers and PEFT libraries
+- SDSU Tide cluster for GPU usage 
