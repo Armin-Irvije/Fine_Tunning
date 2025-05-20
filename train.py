@@ -21,9 +21,9 @@ MODEL_NAME = "openai-community/gpt2"
 OUTPUT_DIR = "models/drug-llm"
 LORA_R = 8
 LORA_ALPHA = 16
-LORA_DROPOUT = 0.05
-BATCH_SIZE = 4  # Reduced batch size
-GRADIENT_ACCUMULATION_STEPS = 8  # Increased gradient accumulation
+LORA_DROPOUT = 0.1
+BATCH_SIZE = 2
+GRADIENT_ACCUMULATION_STEPS = 8
 LEARNING_RATE = 3e-4
 NUM_EPOCHS = 3
 MAX_LENGTH = 512
@@ -39,29 +39,6 @@ tokenizer = GPT2Tokenizer.from_pretrained(MODEL_NAME)
 # GPT-2 doesn't have a pad token by default
 if tokenizer.pad_token is None:
     tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    use_cache=False,  # Turn off past key values caching - fixes gradient checkpointing
-    device_map="auto"
-)
-# Resize embeddings to account for added tokens
-model.resize_token_embeddings(len(tokenizer))
-
-# Configure LoRA - use correct target modules for GPT-2
-peft_config = LoraConfig(
-    task_type=TaskType.CAUSAL_LM,
-    inference_mode=False,
-    r=LORA_R,
-    lora_alpha=LORA_ALPHA,
-    lora_dropout=LORA_DROPOUT,
-    target_modules=["c_attn"],  # This is the correct module for GPT-2
-    fan_in_fan_out=False        # Set to False as the warning will handle it
-)
-
-model = get_peft_model(model, peft_config)
-# device = 'cpu'
-# model.to(device)
 
 # Tokenize the datasets
 def preprocess_function(examples):
@@ -90,6 +67,69 @@ tokenized_datasets = dataset.map(
     remove_columns=['input', 'output']
 )
 
+# Define data collator
+data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+
+# ====== EVALUATE BASE MODEL FIRST ======
+print('Loading the base model for evaluation...')
+base_model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    use_cache=False,
+    device_map="auto"
+)
+base_model.resize_token_embeddings(len(tokenizer))
+
+# Create evaluation args for the base model
+base_eval_args = TrainingArguments(
+    output_dir="./results/base_model_eval",
+    per_device_eval_batch_size=BATCH_SIZE,
+    remove_unused_columns=False,
+    report_to="none",  # Disable reporting
+)
+
+# Create Trainer for evaluation only
+base_trainer = Trainer(
+    model=base_model,
+    args=base_eval_args,
+    eval_dataset=tokenized_datasets["validation"],
+    data_collator=data_collator,
+)
+
+# Evaluate base model
+print('Evaluating base model...')
+base_metrics = base_trainer.evaluate()
+base_eval_loss = base_metrics['eval_loss']
+base_perplexity = math.exp(base_eval_loss)
+print(f"\nBase Model Eval Loss: {base_eval_loss:.4f}")
+print(f"Base Model Perplexity: {base_perplexity:.4f}")
+
+# Free up memory
+del base_model
+del base_trainer
+torch.cuda.empty_cache()  # If using GPU
+
+# ====== NOW CONTINUE WITH FINE-TUNING ======
+print('Loading model for fine-tuning...')
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    use_cache=False,
+    device_map="auto"
+)
+model.resize_token_embeddings(len(tokenizer))
+
+# Configure LoRA
+peft_config = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,
+    inference_mode=False,
+    r=LORA_R,
+    lora_alpha=LORA_ALPHA,
+    lora_dropout=LORA_DROPOUT,
+    target_modules=["c_attn"],
+    fan_in_fan_out=False
+)
+
+model = get_peft_model(model, peft_config)
+
 # Define training arguments
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
@@ -100,20 +140,17 @@ training_args = TrainingArguments(
     num_train_epochs=NUM_EPOCHS,
     logging_dir=f"{OUTPUT_DIR}/logs",
     logging_steps=10,
-    # Use "eval_strategy" instead of "evaluation_strategy" to avoid the deprecation warning
-    eval_strategy="steps",  
+    eval_strategy="steps",
     save_strategy="steps",
     eval_steps=100,
     save_steps=100,
     load_best_model_at_end=True,
     report_to="tensorboard",
     fp16=True,
-    # Turn off gradient_checkpointing which is causing issues
-    gradient_checkpointing=False,  
+    gradient_checkpointing=False,
     warmup_ratio=0.1,
     weight_decay=0.01,
-    remove_unused_columns=False,  # Important for PeftModel
-    # use_cpu = True
+    remove_unused_columns=False,
 )
 
 # Initialize Trainer
@@ -122,18 +159,25 @@ trainer = Trainer(
     args=training_args,
     train_dataset=tokenized_datasets["train"],
     eval_dataset=tokenized_datasets["validation"],
-    data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    data_collator=data_collator,
 )
 
 # Train model
-print('Fine tune model...')
+print('Fine-tuning model...')
 trainer.train()
-print('Evaluate...')
-metrics = trainer.evaluate()
-eval_loss = metrics['eval_loss']
-perplexity = math.exp(eval_loss)
-print(f"\nEval loss: {eval_loss:.4f}")
-print(f"Perplexity: {perplexity:.4f}")
+
+# Evaluate fine-tuned model
+print('Evaluating fine-tuned model...')
+ft_metrics = trainer.evaluate()
+ft_eval_loss = ft_metrics['eval_loss']
+ft_perplexity = math.exp(ft_eval_loss)
+
+# Print comparison
+print("\n===== EVALUATION RESULTS COMPARISON =====")
+print(f"Base Model - Eval Loss: {base_eval_loss:.4f}, Perplexity: {base_perplexity:.4f}")
+print(f"Fine-tuned - Eval Loss: {ft_eval_loss:.4f}, Perplexity: {ft_perplexity:.4f}")
+print(f"Improvement  - Loss: {base_eval_loss - ft_eval_loss:.4f} ({(1 - ft_eval_loss/base_eval_loss) * 100:.2f}%)")
+print(f"Improvement  - Perplexity: {base_perplexity - ft_perplexity:.4f} ({(1 - ft_perplexity/base_perplexity) * 100:.2f}%)")
 
 # Save the fine-tuned model
 model.save_pretrained(f"{OUTPUT_DIR}/final")
